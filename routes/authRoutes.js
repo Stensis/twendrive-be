@@ -5,22 +5,15 @@ const {
   login,
   refresh,
   logout,
-} = require("../controllers/authController");
+  getProfile,
+} = require("../controllers/auth/authController");
+
 const authMiddleware = require("../middleware/authMiddleware");
-const adminMiddleware = require("../middleware/adminMiddleware");
 
 router.post("/register", register);
 router.post("/login", login);
 router.post("/refresh", refresh);
 router.post("/logout", logout);
-
-// Protected routes
-router.get("/profile", authMiddleware, (req, res) => {
-  res.json({ message: "User profile", user: req.user });
-});
-
-router.get("/admin", authMiddleware, adminMiddleware, (req, res) => {
-  res.json({ message: "Admin route access granted!" });
-});
+router.get("/profile", authMiddleware, getProfile);
 
 module.exports = router;

@@ -3,8 +3,8 @@ const jwt = require("jsonwebtoken");
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
-exports.register = async (req, res) => {
-  const { name, email, password, role } = req.body;
+const register = async (req, res) => {
+  const { firstName, lastName, email, phone, password, role } = req.body;
 
   try {
     const userExists = await prisma.user.findUnique({ where: { email } });
@@ -13,12 +13,10 @@ exports.register = async (req, res) => {
 
     const allowedRoles = ["admin", "car_owner", "car_renter"];
 
-    // Ensure valid role
     if (!allowedRoles.includes(role)) {
       return res.status(400).json({ message: "Invalid role" });
     }
 
-    // Restrict admin account creation
     if (role === "admin") {
       if (
         email !== process.env.ADMIN_EMAIL ||
@@ -34,8 +32,10 @@ exports.register = async (req, res) => {
 
     const user = await prisma.user.create({
       data: {
-        name,
+        firstName,     // ✅ Required
+        lastName,      // ✅ Required
         email,
+        phone,         // optional but unique
         password: hashedPassword,
         role,
       },
@@ -45,8 +45,10 @@ exports.register = async (req, res) => {
       message: "User registered successfully",
       user: {
         id: user.id,
-        name: user.name,
+        firstName: user.firstName,
+        lastName: user.lastName,
         email: user.email,
+        phone: user.phone,
         role: user.role,
       },
     });
@@ -57,7 +59,8 @@ exports.register = async (req, res) => {
   }
 };
 
-exports.login = async (req, res) => {
+
+const login = async (req, res) => {
   const { email, password, role } = req.body;
 
   if (!email || !password || !role || role.trim() === "") {
@@ -91,7 +94,6 @@ exports.login = async (req, res) => {
       { expiresIn: "7d" }
     );
 
-    // Store refresh token in HTTP-only cookie
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -113,7 +115,7 @@ exports.login = async (req, res) => {
   }
 };
 
-exports.refresh = async (req, res) => {
+const refresh = async (req, res) => {
   const refreshToken = req.cookies.refreshToken;
 
   if (!refreshToken) {
@@ -137,7 +139,7 @@ exports.refresh = async (req, res) => {
   }
 };
 
-exports.logout = async (req, res) => {
+const logout = async (req, res) => {
   res.clearCookie("refreshToken", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -145,4 +147,16 @@ exports.logout = async (req, res) => {
   });
 
   res.status(200).json({ message: "Logged out successfully" });
+};
+
+const getProfile = async (req, res) => {
+  res.json({ message: "User profile", user: req.user });
+};
+
+module.exports = {
+  register,
+  login,
+  refresh,
+  logout,
+  getProfile,
 };
