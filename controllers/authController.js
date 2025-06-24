@@ -24,11 +24,9 @@ exports.register = async (req, res) => {
         email !== process.env.ADMIN_EMAIL ||
         password !== process.env.ADMIN_PASSWORD
       ) {
-        return res
-          .status(403)
-          .json({
-            message: "You are not authorized to create an admin account",
-          });
+        return res.status(403).json({
+          message: "You are not authorized to create an admin account",
+        });
       }
     }
 
@@ -75,23 +73,34 @@ exports.login = async (req, res) => {
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) return res.status(400).json({ message: "Invalid credentials" });
 
-    // Match the role passed during login with the user's stored role
     if (user.role !== role) {
-      return res
-        .status(403)
-        .json({
-          message: `Unauthorized: expected role '${user.role}', but received '${role}'`,
-        });
+      return res.status(403).json({
+        message: `Unauthorized: expected role '${user.role}', but received '${role}'`,
+      });
     }
 
-    const token = jwt.sign(
+    const accessToken = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
+      { expiresIn: "15m" }
+    );
+
+    const refreshToken = jwt.sign(
+      { id: user.id, email: user.email, role: user.role },
+      process.env.JWT_REFRESH_SECRET,
       { expiresIn: "7d" }
     );
 
+    // Store refresh token in HTTP-only cookie
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
     res.status(200).json({
-      token,
+      accessToken,
       user: {
         id: user.id,
         name: user.name,
@@ -102,4 +111,38 @@ exports.login = async (req, res) => {
   } catch (err) {
     res.status(500).json({ message: "Login failed", error: err.message });
   }
+};
+
+exports.refresh = async (req, res) => {
+  const refreshToken = req.cookies.refreshToken;
+
+  if (!refreshToken) {
+    return res.status(401).json({ message: "No refresh token provided" });
+  }
+
+  try {
+    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+
+    const newAccessToken = jwt.sign(
+      { id: decoded.id, email: decoded.email, role: decoded.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "15m" }
+    );
+
+    res.status(200).json({ accessToken: newAccessToken });
+  } catch (error) {
+    return res
+      .status(403)
+      .json({ message: "Invalid or expired refresh token" });
+  }
+};
+
+exports.logout = async (req, res) => {
+  res.clearCookie("refreshToken", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+  });
+
+  res.status(200).json({ message: "Logged out successfully" });
 };
