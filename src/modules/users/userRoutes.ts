@@ -8,7 +8,6 @@ const router: Router = Router();
 // Apply auth and restrict to admins
 router.use(authMiddleware, roleMiddleware(['admin']));
 
-
 router.get("/users/all", getAllUsers);
 router.get('/users/:id', getUserById);
 router.put('/users/:id', updateUser);
