@@ -14,47 +14,150 @@ enum Role {
 }
 
 model User {
-  id          Int      @id @default(autoincrement())
-  firstName   String
-  lastName    String
-  email       String   @unique
-  phone       String?  @unique
-  password    String
-  role        Role     @default(car_renter)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  deletedAt   DateTime?
-  deleteAfter DateTime?
-  disabled     Boolean   @default(false)
-  cars        Car[]    @relation("UserCars")
+  id             Int             @id @default(autoincrement())
+  firstName      String
+  lastName       String
+  userName       String?         @unique
+  email          String          @unique
+  phone          String?         @unique
+  password       String
+  role           Role            @default(car_renter)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  deletedAt      DateTime?
+  deleteAfter    DateTime?
+  disabled       Boolean         @default(false)
+
+  // Relations
+  cars           Car[]           @relation("UserCars")
+  bookingsMade   Booking[]       @relation("RenterBookings")
+  bookingsOwned  Booking[]       @relation("OwnerBookings")
+  reviews        CarReview[]
+  notifications  Notification[]
+  availabilities Availability[]
 }
 
-
 model Car {
-  id               Int       @id @default(autoincrement())
-  uuid             String    @unique @default(uuid())
-  numberPlate      String    @unique
+  id               Int             @id @default(autoincrement())
+  uuid             String          @unique @default(uuid())
+  numberPlate      String          @unique
   name             String
   make             String
   model            String
   year             Int
   fuelType         String
   mileage          Int
-  features         String[]  @default([])
+  features         String[]        @default([])
   image            String
-  status           String    @default("available") // CAR_STATUSES: 'available' | 'unavailable' | 'deleted'
+  status           String          @default("available") // available, unavailable, deleted
   price            Float
-  bookings         Int       @default(0)
-  rating           Float     @default(0)
-  totalEarnings    Float     @default(0)
+  bookings         Int             @default(0)
+  rating           Float           @default(0)
+  totalEarnings    Float           @default(0)
   location         String
   description      String?
   lastInspection   DateTime?
-  inspectionStatus String    @default("pending")
-  inspectionImages String[] @default([])
+  inspectionStatus String          @default("pending")
+  inspectionImages String[]        @default([])
   deletedAt        DateTime?
   ownerId          Int
-  owner            User      @relation("UserCars", fields: [ownerId], references: [id])
-  createdAt        DateTime  @default(now())
+  createdAt        DateTime        @default(now())
+
+  // Relations
+  owner            User            @relation("UserCars", fields: [ownerId], references: [id])
+  documents        CarDocument[]
+  availabilities   Availability[]
+  bookingsList     Booking[]
+  pricing          Pricing[]
+  reviews          CarReview[]
 }
 
+model CarDocument {
+  id         Int      @id @default(autoincrement())
+  carId      Int
+  title      String
+  type       String
+  url        String
+  uploadedAt DateTime @default(now())
+
+  car        Car      @relation(fields: [carId], references: [id])
+}
+
+model Availability {
+  id        Int       @id @default(autoincrement())
+  carId     Int
+  userId    Int?      // Optional to avoid migration failures
+  startDate DateTime
+  endDate   DateTime
+  status    String    @default("available") // available | occupied | canceled
+  createdAt DateTime  @default(now())
+
+  car       Car       @relation(fields: [carId], references: [id])
+  user      User?     @relation(fields: [userId], references: [id])
+}
+
+model Booking {
+  id         Int       @id @default(autoincrement())
+  carId      Int
+  renterId   Int
+  ownerId    Int
+  startDate  DateTime
+  endDate    DateTime
+  agreement  String    // PDF or base64
+  status     String    // pending | confirmed | completed | cancelled
+  createdAt  DateTime  @default(now())
+
+  car        Car       @relation(fields: [carId], references: [id])
+  renter     User      @relation("RenterBookings", fields: [renterId], references: [id])
+  owner      User      @relation("OwnerBookings", fields: [ownerId], references: [id])
+  payment    Payment?
+}
+
+model Payment {
+  id          Int       @id @default(autoincrement())
+  bookingId   Int       @unique
+  method      String    // M-Pesa, Card, etc.
+  amount      Float
+  platformFee Float     // 10% admin cut
+  ownerAmount Float     // 90% credited to owner
+  status      String    // success | failed | pending
+  createdAt   DateTime  @default(now())
+
+  booking     Booking   @relation(fields: [bookingId], references: [id])
+}
+
+model Pricing {
+  id          Int       @id @default(autoincrement())
+  carId       Int
+  ratePerDay  Float
+  discount    Float      @default(0)
+  createdAt   DateTime   @default(now())
+
+  car         Car        @relation(fields: [carId], references: [id])
+}
+
+model CarReview {
+  id         Int       @id @default(autoincrement())
+  carId      Int
+  userId     Int
+  rating     Int       // 1–5
+  comment    String
+  reply      String?
+  createdAt  DateTime  @default(now())
+
+  car        Car       @relation(fields: [carId], references: [id])
+  user       User      @relation(fields: [userId], references: [id])
+
+  @@unique([carId, userId]) // Prevent double reviews
+}
+
+model Notification {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  title     String
+  message   String
+  isRead    Boolean   @default(false)
+  createdAt DateTime  @default(now())
+
+  user      User      @relation(fields: [userId], references: [id])
+}

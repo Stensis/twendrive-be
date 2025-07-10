@@ -109,7 +109,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     const accessToken = generateToken(
       { id: user.id, email: user.email, role: user.role },
       process.env.JWT_SECRET!,
-      "1h"
+      "1H"
     );
 
     const refreshToken = generateToken(

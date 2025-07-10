@@ -41,12 +41,7 @@ router.get(
   getMyCars
 );
 router.post("/add-car", authMiddleware, roleMiddleware(["car_owner"]), addCar);
-router.put(
-  "/:uuid",
-  authMiddleware,
-  roleMiddleware(["car_owner"]),
-  updateCar
-);
+router.put("/:uuid", authMiddleware, roleMiddleware(["car_owner"]), updateCar);
 router.delete(
   "/:uuid",
   authMiddleware,
