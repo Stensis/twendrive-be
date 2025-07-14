@@ -15,10 +15,12 @@ enum Role {
 
 model User {
   id             Int             @id @default(autoincrement())
+  uuid           String          @default(uuid()) @unique
   firstName      String
   lastName       String
   userName       String?         @unique
   email          String          @unique
+  emailVerified  Boolean
   phone          String?         @unique
   password       String
   role           Role            @default(car_renter)
@@ -35,6 +37,19 @@ model User {
   reviews        CarReview[]
   notifications  Notification[]
   availabilities Availability[]
+  otps           Otp[]
+}
+
+model Otp {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  code      String
+  expiresAt DateTime
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model Car {

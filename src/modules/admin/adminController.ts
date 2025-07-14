@@ -1,5 +1,6 @@
 import { Response, Request } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { userSelectFields } from '@modules/users/userController';
 
 const prisma = new PrismaClient();
 
@@ -8,16 +9,7 @@ export const getAllUsers = async (_req: Request, res: Response): Promise<void> =
   try {
     const users = await prisma.user.findMany({
       where: { deletedAt: null },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        phone: true,
-        role: true,
-        disabled:true,
-        createdAt: true,
-      },
+      select: userSelectFields,
     });
 
     res.status(200).json({ users });

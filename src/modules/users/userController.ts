@@ -4,6 +4,19 @@ import { AuthenticatedRequest } from "src/types/express";
 
 const prisma = new PrismaClient();
 
+export const userSelectFields = {
+  id: true,
+  firstName: true,
+  lastName: true,
+  userName: true,
+  email: true,
+  emailVerified: true,
+  phone: true,
+  role: true,
+  createdAt: true,
+  disabled: true,
+};
+
 // Get all users (Admin only)
 // Get both active and disabled users
 export const getAllUsers = async (
@@ -16,16 +29,7 @@ export const getAllUsers = async (
         deletedAt: null,
         disabled: false,
       },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        phone: true,
-        role: true,
-        createdAt: true,
-        disabled: true,
-      },
+      select: userSelectFields,
     });
 
     const disabledUsers = await prisma.user.findMany({
@@ -33,16 +37,7 @@ export const getAllUsers = async (
         deletedAt: null,
         disabled: true,
       },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        phone: true,
-        role: true,
-        createdAt: true,
-        disabled: true,
-      },
+      select: userSelectFields,
     });
 
     res.status(200).json({
@@ -67,15 +62,7 @@ export const getUserById = async (
   try {
     const user = await prisma.user.findUnique({
       where: { id: Number(id) },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        phone: true,
-        role: true,
-        createdAt: true,
-      },
+      select: userSelectFields,
     });
 
     if (!user) {
