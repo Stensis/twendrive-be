@@ -3,7 +3,11 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { PrismaClient } from "@prisma/client";
 
-import { AuthenticatedRequest, JwtPayload } from "src/types/express";
+import {
+  AuthenticatedRequest,
+  JwtPayload,
+  SelectedUser,
+} from "src/types/express";
 import { USER_ROLES } from "src/constants/roles";
 import { errorResponse, successResponse } from "src/utils/response";
 import { generateToken } from "src/utils/token";
@@ -13,6 +17,7 @@ import { sendEmailOTP, verifyOTP } from "@utils/otp";
 import { registerSchema } from "@utils/validators";
 import { sendMail, sendVerificationEmail } from "@utils/mailer";
 import { generateVerificationToken } from "@utils/emailVerification";
+import { userSelectFields } from "@modules/users/userController";
 
 const prisma = new PrismaClient();
 
@@ -103,11 +108,12 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   const { identifier, password, role, otp } = req.body;
 
   try {
-    const user = await prisma.user.findFirst({
+    const user = (await prisma.user.findFirst({
       where: {
         OR: [{ userName: identifier }, { email: identifier }],
       },
-    });
+      select: userSelectFields,
+    })) as SelectedUser;
 
     if (!user) {
       return errorResponse(res, "Invalid credentials", 400);
@@ -117,7 +123,11 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return errorResponse(res, "Your account has been disabled", 403);
     }
 
+    if (!user.password) {
+      return errorResponse(res, "Missing credentials", 400);
+    }
     const valid = await bcrypt.compare(password, user.password);
+
     if (!valid) {
       return errorResponse(res, "Invalid credentials", 400);
     }
@@ -126,6 +136,15 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return errorResponse(
         res,
         `Unauthorized: expected role '${user.role}'`,
+        403
+      );
+    }
+
+    // 🛑 Require email verification for non-admin users
+    if (user.role !== "admin" && !user.emailVerified) {
+      return errorResponse(
+        res,
+        "Please verify your email before logging in.",
         403
       );
     }
@@ -143,6 +162,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
             email: user.email,
           },
         });
+        return; // ✅ Make sure this function exits
       }
 
       const isValidOTP = await verifyOTP(user.id, otp);
@@ -266,29 +286,28 @@ export const verifyOtp = async (req: Request, res: Response): Promise<void> => {
 
   try {
     const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return errorResponse(res, "User not found", 404);
 
-    if (!user) {
-      return errorResponse(res, "User not found", 404);
-    }
-
-    const isValid = await verifyOTP(user.id, otp);
-    if (!isValid) {
-      return errorResponse(res, "Invalid OTP", 403);
-    }
+    const isValid = await verifyOTP(user.id, otp.toString());
+    if (!isValid) return errorResponse(res, "Invalid or expired OTP", 403);
 
     const accessToken = generateToken(
       { id: user.id, email: user.email, role: user.role },
       process.env.JWT_SECRET!,
       "1h"
     );
-
     const refreshToken = generateToken(
       { id: user.id, email: user.email, role: user.role },
       process.env.JWT_REFRESH_SECRET!,
       "7d"
     );
 
-    res.cookie("refreshToken", refreshToken, refreshTokenCookieOptions);
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
 
     return successResponse(
       res,
@@ -303,9 +322,9 @@ export const verifyOtp = async (req: Request, res: Response): Promise<void> => {
       },
       "OTP verified, login successful"
     );
-  } catch (err: any) {
-    console.error("Verify OTP Error:", err);
-    return errorResponse(res, "OTP verification failed", 500);
+  } catch (err) {
+    console.error("OTP Verification Error:", err);
+    return errorResponse(res, "Something went wrong", 500);
   }
 };
 

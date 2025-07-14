@@ -15,6 +15,7 @@ export const userSelectFields = {
   role: true,
   createdAt: true,
   disabled: true,
+  password: true,
 };
 
 // Get all users (Admin only)

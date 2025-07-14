@@ -14,3 +14,7 @@ export interface AuthenticatedRequest extends Request {
     [key: string]: any;
   };
 }
+
+export type SelectedUser = Prisma.UserGetPayload<{
+  select: typeof userSelectFields;
+}>;
