@@ -2,10 +2,19 @@ import { Response } from "express";
 
 export const successResponse = (
   res: Response,
-  data: any,
+  data?: any,
   message = "Success"
 ): void => {
-  res.status(200).json({ success: true, message, data });
+  const response: any = {
+    success: true,
+    message,
+  };
+
+  if (data !== undefined && data !== null) {
+    response.data = data;
+  }
+
+  res.status(200).json(response);
 };
 
 export const errorResponse = (

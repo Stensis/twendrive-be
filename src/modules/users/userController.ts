@@ -6,6 +6,7 @@ const prisma = new PrismaClient();
 
 export const userSelectFields = {
   id: true,
+  uuid: true,
   firstName: true,
   lastName: true,
   userName: true,
@@ -18,8 +19,32 @@ export const userSelectFields = {
   password: true,
 };
 
+// Get the authenticated user's details
+export const getMe = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user?.id },
+      select: userSelectFields
+    });
+
+    if (!user) {
+      res.status(404).json({ message: "User not found" });
+      return;
+    }
+
+    res.status(200).json({ success: true, user });
+  } catch (err: any) {
+    res
+      .status(500)
+      .json({ message: "Failed to fetch user profile", error: err.message });
+  }
+};
+
+
 // Get all users (Admin only)
-// Get both active and disabled users
 export const getAllUsers = async (
   _req: AuthenticatedRequest,
   res: Response
