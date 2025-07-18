@@ -1,8 +1,11 @@
 import { Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { AuthenticatedRequest } from "src/types/express";
+import multer from "multer";
+import { storage } from "@middlewares/upload";
 
 const prisma = new PrismaClient();
+const upload = multer({ storage });
 
 export const userSelectFields = {
   id: true,
@@ -14,6 +17,8 @@ export const userSelectFields = {
   emailVerified: true,
   phone: true,
   role: true,
+  avatar: true,
+  location: true,
   createdAt: true,
   disabled: true,
   password: true,
@@ -27,7 +32,7 @@ export const getMe = async (
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user?.id },
-      select: userSelectFields
+      select: userSelectFields,
     });
 
     if (!user) {
@@ -43,6 +48,51 @@ export const getMe = async (
   }
 };
 
+// Update authenticated user's profile
+export const updateMyProfile = [
+  upload.single('avatar'), // 👈 multer handles the file
+  async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+    const { firstName, lastName, phone, userName, email, location, avatarUrl } = req.body;
+
+    const avatar = req.file
+      ? `/uploads/avatars/${req.file.filename}` // 👈 if a file was uploaded
+      : avatarUrl || undefined;                // 👈 if using a URL instead
+
+    try {
+      const updatedUser = await prisma.user.update({
+        where: { id: userId },
+        data: {
+          firstName,
+          lastName,
+          userName,
+          email,
+          phone,
+          location,
+          avatar, // ✅ just save as string
+        },
+        select: {
+          ...userSelectFields,
+          password: false,
+        },
+      });
+
+      res.status(200).json({
+        success: true,
+        message: "Profile updated successfully",
+        user: updatedUser,
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        success: false,
+        message: "Failed to update profile",
+        error: err.message,
+      });
+    }
+  },
+];
 
 // Get all users (Admin only)
 export const getAllUsers = async (

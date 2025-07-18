@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { AuthenticatedRequest } from 'src/types/express';
 import * as bookingService from './bookingService';
 import { ALLOWED_STATUSES } from 'src/constants/constants';
+import prisma from 'src/config/database';
 
 export const createBooking = async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -49,5 +50,37 @@ export const updateBookingStatus = async (req: AuthenticatedRequest, res: Respon
     res.status(200).json({ message: 'Status updated', result });
   } catch (err: any) {
     res.status(500).json({ message: 'Failed to update status', error: err.message });
+  }
+};
+// ANALYTICS FOR ADMIN & OWNERS
+export const getMonthlyEarnings = async (req: AuthenticatedRequest, res: Response) => {
+  const isAdmin = req.user?.role === 'admin';
+  const userId = req.user!.id;
+
+  try {
+    const payments = await prisma.payment.findMany({
+      where: isAdmin
+        ? { status: 'success' }
+        : {
+            status: 'success',
+            booking: {
+              ownerId: userId,
+            },
+          },
+      include: {
+        booking: true,
+      },
+    });
+
+    const monthlyTotals: Record<string, number> = {};
+
+    for (const payment of payments) {
+      const monthKey = payment.createdAt.toISOString().substring(0, 7); // e.g. 2025-07
+      monthlyTotals[monthKey] = (monthlyTotals[monthKey] || 0) + payment.ownerAmount;
+    }
+
+    res.status(200).json({ monthlyTotals });
+  } catch (err: any) {
+    res.status(500).json({ message: 'Failed to get earnings', error: err.message });
   }
 };

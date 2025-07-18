@@ -12,23 +12,24 @@ enum Role {
   car_renter
   car_owner
 }
-
 model User {
-  id             Int             @id @default(autoincrement())
-  uuid           String          @default(uuid()) @unique
+  id             Int      @id @default(autoincrement())
+  uuid           String   @default(uuid()) @unique
   firstName      String
   lastName       String
-  userName       String?         @unique
-  email          String          @unique
+  userName       String?  @unique
+  email          String   @unique
   emailVerified  Boolean
-  phone          String?         @unique
+  phone          String?  @unique
   password       String
-  role           Role            @default(car_renter)
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  role           Role     @default(car_renter)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
   deletedAt      DateTime?
   deleteAfter    DateTime?
-  disabled       Boolean         @default(false)
+  disabled       Boolean  @default(false)
+  location       String?  
+  avatar         String?  
 
   // Relations
   cars           Car[]           @relation("UserCars")
@@ -175,4 +176,13 @@ model Notification {
   createdAt DateTime  @default(now())
 
   user      User      @relation(fields: [userId], references: [id])
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  action    String
+  metadata  Json
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
 }

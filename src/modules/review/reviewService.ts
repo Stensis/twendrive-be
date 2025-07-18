@@ -1,7 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
-// Add review if renter has completed booking & hasn't reviewed yet
 export const addReview = async ({
   carId,
   userId,
@@ -14,62 +13,84 @@ export const addReview = async ({
   comment: string;
 }) => {
   const booking = await prisma.booking.findFirst({
-    where: {
-      carId,
-      renterId: userId,
-      status: "completed",
-    },
+    where: { carId, renterId: userId, status: "completed" },
   });
 
-  if (!booking) throw new Error("You can only review cars you've completed bookings for");
+  if (!booking) {
+    throw new Error("You can only review cars you've completed bookings for.");
+  }
 
-  const existing = await prisma.carReview.findFirst({
+  const existingReview = await prisma.carReview.findFirst({
     where: { carId, userId },
   });
 
-  if (existing) throw new Error("You have already reviewed this car");
+  if (existingReview) {
+    throw new Error("You have already submitted a review for this car.");
+  }
 
   const review = await prisma.carReview.create({
     data: { carId, userId, rating, comment },
   });
 
-  // Recalculate average rating for car
-  const agg = await prisma.carReview.aggregate({
+  // Update average rating
+  const { _avg } = await prisma.carReview.aggregate({
     where: { carId },
     _avg: { rating: true },
   });
 
   await prisma.car.update({
     where: { id: carId },
-    data: { rating: agg._avg.rating || 0 },
+    data: { rating: _avg.rating || 0 },
   });
 
   return review;
 };
 
-// Allow owner to reply
-export const replyToReview = async (reviewId: number, reply: string, ownerId: number) => {
+export const replyToReview = async (
+  reviewId: number,
+  reply: string,
+  ownerId: number
+) => {
   const review = await prisma.carReview.findUnique({
     where: { id: reviewId },
     include: { car: true },
   });
 
-  if (!review) throw new Error("Review not found");
-  if (review.car.ownerId !== ownerId) throw new Error("Only car owner can reply");
+  if (!review) throw new Error("Review not found.");
+  if (review.car.ownerId !== ownerId)
+    throw new Error("Only the car owner can reply to this review.");
 
-  return await prisma.carReview.update({
+  return prisma.carReview.update({
     where: { id: reviewId },
     data: { reply },
   });
 };
 
-// Get all reviews for a car
-export const getCarReviews = async (carId: number) => {
-  return await prisma.carReview.findMany({
-    where: { carId },
-    include: {
-      user: { select: { id: true, firstName: true, lastName: true } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+export const getCarReviews = async (carId: number, page = 1, limit = 10) => {
+  const skip = (page - 1) * limit;
+
+  const [reviews, total] = await Promise.all([
+    prisma.carReview.findMany({
+      where: { carId },
+      include: {
+        user: { select: { id: true, firstName: true, lastName: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
+    }),
+    prisma.carReview.count({ where: { carId } }),
+  ]);
+
+  return {
+    reviews,
+    page,
+    limit,
+    total,
+    totalPages: Math.ceil(total / limit),
+  };
 };
+export function logAudit(arg0: { userId: number; action: string; metadata: { reviewId: any; carId: any; }; }) {
+  throw new Error("Function not implemented.");
+}
+

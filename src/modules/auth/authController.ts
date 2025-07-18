@@ -308,17 +308,14 @@ export const verifyOtp = async (req: Request, res: Response): Promise<void> => {
       sameSite: "strict",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
+    
+    const { password, ...safeUser } = user;
 
     return successResponse(
       res,
       {
         accessToken,
-        user: {
-          id: user.id,
-          name: `${user.firstName} ${user.lastName}`,
-          email: user.email,
-          role: user.role,
-        },
+        user: safeUser,
       },
       "OTP verified, login successful"
     );

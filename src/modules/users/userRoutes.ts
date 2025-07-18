@@ -5,6 +5,7 @@ import {
   getAllUsers,
   getMe,
   getUserById,
+  updateMyProfile,
   updateUser,
 } from "./userController";
 import authMiddleware from "src/middlewares/authMiddleware";
@@ -13,6 +14,7 @@ const router: Router = Router();
 
 // ✅ Allow any authenticated user to access their own info
 router.get("/me", authMiddleware, getMe);
+router.put("/update/me", authMiddleware, updateMyProfile); // 👈 new route
 
 // ✅ All routes below this are for admin only
 router.use(authMiddleware, roleMiddleware(["admin"]));
